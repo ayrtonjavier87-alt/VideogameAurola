@@ -1,0 +1,1642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aurelia Frontier</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#1b2230; --panel2:#242c3d; --accent:#5fd1a8; --accent2:#f2c14e;
+    --text:#e9edf3; --muted:#8a93a6; --danger:#e6584f; --hp:#5fd16b; --hpmid:#e6b84f; --hplow:#e6584f;
+    --border:#3a4457;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:#000;font-family:'Courier New',ui-monospace,monospace;color:var(--text);}
+  #app{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 20%,#1a2233,#05070a);}
+  #game-container{position:relative;width:480px;background:var(--bg);border:4px solid #000;border-radius:10px;box-shadow:0 0 0 2px #445,0 10px 40px rgba(0,0,0,.6);overflow:hidden;}
+  #hud{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--panel);border-bottom:2px solid var(--border);font-size:11px;}
+  #hud .hleft{display:flex;gap:8px;align-items:center;}
+  #hud .hright{display:flex;gap:10px;align-items:center;color:var(--accent2);}
+  canvas#map-canvas{display:block;background:#000;image-rendering:pixelated;width:480px;height:352px;}
+  #quickbar{display:flex;background:var(--panel);border-top:2px solid var(--border);}
+  #quickbar button{flex:1;background:transparent;color:var(--text);border:none;border-right:1px solid var(--border);padding:7px 0;font-family:inherit;font-size:10px;cursor:pointer;}
+  #quickbar button:last-child{border-right:none;}
+  #quickbar button:hover{background:var(--panel2);color:var(--accent);}
+  #dialogue-box{position:absolute;left:8px;right:8px;bottom:52px;background:rgba(10,14,20,.94);border:2px solid var(--accent);border-radius:6px;padding:10px 12px;font-size:12px;line-height:1.5;min-height:54px;}
+  #dialogue-box .dq-name{color:var(--accent2);font-weight:bold;margin-bottom:3px;}
+  #dialogue-box .dq-next{position:absolute;right:10px;bottom:6px;color:var(--muted);font-size:10px;animation:blink 1s infinite;}
+  #dialogue-choices{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+  #dialogue-choices button{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:5px 8px;font-family:inherit;font-size:11px;border-radius:4px;cursor:pointer;text-align:left;}
+  #dialogue-choices button:hover{border-color:var(--accent);color:var(--accent);}
+  @keyframes blink{0%,49%{opacity:1;}50%,100%{opacity:0;}}
+  .hidden{display:none !important;}
+  #overlay{position:absolute;inset:0;background:rgba(5,7,10,.88);display:flex;flex-direction:column;padding:10px;overflow-y:auto;font-size:12px;}
+  #overlay h2{margin:0 0 8px 0;color:var(--accent2);font-size:15px;border-bottom:1px solid var(--border);padding-bottom:6px;}
+  .ov-close{position:absolute;top:8px;right:10px;background:var(--danger);color:#fff;border:none;border-radius:4px;padding:4px 9px;cursor:pointer;font-family:inherit;}
+  .item-row,.mon-row,.quest-row,.shop-row{background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:7px 9px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;}
+  .item-row:hover,.mon-row:hover,.shop-row:hover{border-color:var(--accent);}
+  .mon-row.fainted{opacity:.5;}
+  .mini-hpbar{width:90px;height:7px;background:#111;border-radius:3px;overflow:hidden;border:1px solid #000;}
+  .mini-hpbar > div{height:100%;}
+  .badge-chip{display:inline-block;background:var(--accent2);color:#000;padding:2px 6px;border-radius:10px;font-size:10px;margin-right:4px;}
+  .tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:8px;color:#000;font-weight:bold;margin-right:3px;}
+  button.gamebtn{background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:5px;font-family:inherit;cursor:pointer;font-size:11px;}
+  button.gamebtn:hover{border-color:var(--accent);color:var(--accent);}
+  button.gamebtn:disabled{opacity:.35;cursor:not-allowed;}
+  #title-screen{position:absolute;inset:0;background:linear-gradient(180deg,#0a1a2a,#132a1c);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50;}
+  #title-screen h1{font-size:26px;color:var(--accent2);text-shadow:2px 2px 0 #000;letter-spacing:2px;margin:0;}
+  #title-screen p{color:var(--muted);font-size:11px;margin:0;}
+  /* Battle */
+  #battle-screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#0f1a14;}
+  #battle-scene{flex:1;position:relative;overflow:hidden;}
+  .b-mon{position:absolute;display:flex;flex-direction:column;align-items:center;}
+  #b-foe-mon{top:14px;left:20px;}
+  #b-ally-mon{bottom:8px;right:26px;}
+  .b-platform{width:70px;height:16px;background:radial-gradient(ellipse,#3a5,#131);border-radius:50%;margin-top:-6px;}
+  .b-panel{width:210px;background:rgba(10,14,10,.85);border:2px solid #3a4;border-radius:8px;padding:6px 9px;font-size:10px;}
+  #b-foe-panel{align-self:flex-start;margin-left:8px;}
+  #b-ally-panel{align-self:flex-end;margin-right:8px;margin-top:8px;}
+  .b-namerow{display:flex;justify-content:space-between;}
+  .b-hpbar{width:100%;height:8px;background:#222;border-radius:4px;overflow:hidden;border:1px solid #000;margin:3px 0;}
+  .b-hpbar>div{height:100%;transition:width .4s;}
+  .b-xpbar{width:100%;height:4px;background:#222;border-radius:2px;overflow:hidden;}
+  .b-xpbar>div{height:100%;background:#4aa3f0;}
+  #battle-bottom{height:112px;background:var(--panel);border-top:2px solid var(--border);display:flex;}
+  #battle-log{flex:1;padding:8px 10px;font-size:11px;line-height:1.5;overflow-y:auto;}
+  #battle-menu{width:200px;display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px;align-content:start;}
+  #battle-menu button{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:8px 4px;font-family:inherit;font-size:11px;cursor:pointer;}
+  #battle-menu button:hover{border-color:var(--accent2);color:var(--accent2);}
+  #battle-sub{width:200px;padding:8px;overflow-y:auto;}
+  .status-tag{font-size:8px;padding:1px 4px;border-radius:5px;background:#a55;color:#fff;margin-left:4px;}
+  #toast{position:absolute;top:44px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:1px solid var(--accent);color:var(--accent);padding:6px 14px;border-radius:6px;font-size:11px;z-index:80;pointer-events:none;transition:opacity .3s;}
+  #weather-overlay{position:absolute;left:0;top:34px;width:480px;height:352px;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="game-container">
+  <div id="title-screen">
+    <h1>AURELIA FRONTIER</h1>
+    <p>an original monster-catching adventure</p>
+    <button class="gamebtn" id="btn-new" style="padding:10px 22px;font-size:13px;">New Game</button>
+    <button class="gamebtn" id="btn-continue" style="padding:10px 22px;font-size:13px;">Continue</button>
+    <p style="max-width:380px;text-align:center;margin-top:10px;">Arrow keys / WASD to move &middot; E to interact &middot; Esc to close menus</p>
+  </div>
+
+  <div id="hud">
+    <div class="hleft"><span id="hud-location">-</span></div>
+    <div class="hright">
+      <span id="hud-weather">☀️ Clear</span>
+      <span id="hud-money">💰0</span>
+    </div>
+  </div>
+
+  <canvas id="map-canvas" width="480" height="352"></canvas>
+  <canvas id="weather-overlay" width="480" height="352"></canvas>
+
+  <div id="quickbar">
+    <button data-menu="party">Party</button>
+    <button data-menu="bag">Bag</button>
+    <button data-menu="quests">Quests</button>
+    <button data-menu="dex">Dex</button>
+    <button data-menu="settings">Menu</button>
+  </div>
+
+  <div id="dialogue-box" class="hidden">
+    <div class="dq-name" id="dq-name"></div>
+    <div id="dq-text"></div>
+    <div id="dialogue-choices"></div>
+    <div class="dq-next" id="dq-next">▼ press E</div>
+  </div>
+
+  <div id="overlay" class="hidden"></div>
+
+  <div id="battle-screen" class="hidden">
+    <div id="battle-scene">
+      <div class="b-mon" id="b-foe-mon"><canvas width="72" height="72"></canvas><div class="b-platform"></div></div>
+      <div class="b-mon" id="b-ally-mon"><canvas width="88" height="88"></canvas><div class="b-platform"></div></div>
+      <div class="b-panel" id="b-foe-panel"></div>
+      <div class="b-panel" id="b-ally-panel"></div>
+    </div>
+    <div id="battle-bottom">
+      <div id="battle-log"></div>
+      <div id="battle-menu" class="hidden"></div>
+      <div id="battle-sub" class="hidden"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+</div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================== UTIL ============================== */
+function rnd(min,max){return Math.floor(Math.random()*(max-min+1))+min;}
+function chance(p){return Math.random()*100 < p;}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function pick(arr){return arr[Math.floor(Math.random()*arr.length)];}
+function weightedPick(list){ // [{w,...}]
+  const total=list.reduce((s,i)=>s+i.w,0);
+  let r=Math.random()*total;
+  for(const it of list){ if(r<it.w) return it; r-=it.w; }
+  return list[list.length-1];
+}
+function sleep(ms){return new Promise(res=>setTimeout(res,ms));}
+function uid(){return 'm'+(++uid._c);} uid._c=0;
+
+/* ============================== AUDIO ============================== */
+const Audio_ = (function(){
+  let ctx=null;
+  function ensure(){ if(!ctx){ try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return ctx; }
+  function beep(freq,dur,type,vol){
+    if(!STATE.settings.sfxOn) return;
+    const c=ensure(); if(!c) return;
+    const o=c.createOscillator(), g=c.createGain();
+    o.type=type||'square'; o.frequency.value=freq;
+    g.gain.value=(vol||0.06);
+    o.connect(g); g.connect(c.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime+dur);
+    o.stop(c.currentTime+dur);
+  }
+  let musicTimer=null, step=0;
+  const themeDay=[262,330,392,330,294,330,392,440];
+  const themeNight=[220,196,220,262,196,175,196,220];
+  const themeBattle=[196,220,247,220,196,165,196,220];
+  function musicTick(){
+    if(!STATE.settings.musicOn) return;
+    let theme=themeDay;
+    if(STATE.inBattle) theme=themeBattle;
+    else if(isNight()) theme=themeNight;
+    beep(theme[step%theme.length], 0.28, 'triangle', 0.025);
+    step++;
+  }
+  function start(){ if(musicTimer) return; musicTimer=setInterval(musicTick,330); }
+  function stop(){ clearInterval(musicTimer); musicTimer=null; }
+  return {
+    click:()=>beep(520,0.05,'square',0.05),
+    move:()=>beep(180,0.04,'square',0.02),
+    hit:()=>beep(120,0.12,'sawtooth',0.08),
+    superEffective:()=>beep(760,0.15,'square',0.08),
+    notEffective:()=>beep(90,0.18,'sine',0.06),
+    faint:()=>beep(80,0.4,'sawtooth',0.08),
+    catchTry:()=>beep(300,0.1,'square',0.05),
+    catchSuccess:()=>{beep(523,0.12,'square',0.07);setTimeout(()=>beep(659,0.12,'square',0.07),130);setTimeout(()=>beep(784,0.2,'square',0.07),260);},
+    catchFail:()=>beep(150,0.3,'sawtooth',0.07),
+    levelUp:()=>{beep(440,0.1,'triangle',0.07);setTimeout(()=>beep(660,0.15,'triangle',0.07),110);},
+    evolve:()=>{beep(300,0.15,'sine',0.08);setTimeout(()=>beep(500,0.15,'sine',0.08),160);setTimeout(()=>beep(700,0.25,'sine',0.08),320);},
+    heal:()=>beep(880,0.1,'sine',0.05),
+    money:()=>beep(988,0.06,'square',0.04),
+    startMusic:start, stopMusic:stop
+  };
+})();
+
+/* ============================== TYPE SYSTEM ============================== */
+const TYPES = ['Normal','Fire','Water','Grass','Electric','Rock','Flying','Bug','Psychic','Dark'];
+const TYPE_COLORS = {Normal:'#c9c3a8',Fire:'#e8703a',Water:'#4a90d9',Grass:'#5fb85c',Electric:'#f0c93d',
+  Rock:'#a68a5b',Flying:'#93c9e8',Bug:'#a3c93d',Psychic:'#e06fb0',Dark:'#5a5468'};
+const TYPE_CHART = {
+  Fire:{Grass:2,Bug:2,Water:0.5,Rock:0.5,Fire:0.5},
+  Water:{Fire:2,Rock:2,Grass:0.5,Electric:0.5,Water:0.5},
+  Grass:{Water:2,Rock:2,Fire:0.5,Bug:0.5,Flying:0.5,Grass:0.5},
+  Electric:{Water:2,Flying:2,Grass:0.5,Electric:0.5,Rock:0.5},
+  Rock:{Fire:2,Flying:2,Bug:2,Water:0.5,Grass:0.5},
+  Flying:{Grass:2,Bug:2,Electric:0.5,Rock:0.5},
+  Bug:{Grass:2,Psychic:2,Dark:2,Fire:0.5,Flying:0.5,Rock:0.5},
+  Psychic:{Bug:0.5,Dark:0.5,Rock:1.25},
+  Dark:{Psychic:2,Dark:0.5},
+  Normal:{Rock:0.5}
+};
+function typeEff(atkType, defTypes){
+  let m=1;
+  const chart = TYPE_CHART[atkType]||{};
+  for(const t of defTypes){ if(t && chart[t]!==undefined) m*=chart[t]; }
+  return m;
+}
+
+/* ============================== MOVES ============================== */
+const MOVES = {
+  tackle:{name:'Tackle',type:'Normal',power:40,acc:100,pp:35,cat:'phy'},
+  growl:{name:'Growl',type:'Normal',power:0,acc:100,pp:40,cat:'status',effect:{stat:'atk',amount:-1,target:'foe'}},
+  ember:{name:'Ember',type:'Fire',power:40,acc:100,pp:25,cat:'spec',effect:{status:'burn',chance:15}},
+  flamethrower:{name:'Flamethrower',type:'Fire',power:75,acc:100,pp:15,cat:'spec',effect:{status:'burn',chance:12}},
+  watergun:{name:'Water Gun',type:'Water',power:40,acc:100,pp:25,cat:'spec'},
+  aquatail:{name:'Aqua Tail',type:'Water',power:68,acc:95,pp:15,cat:'phy'},
+  vinewhip:{name:'Vine Whip',type:'Grass',power:40,acc:100,pp:25,cat:'phy'},
+  leafblade:{name:'Leaf Blade',type:'Grass',power:68,acc:100,pp:15,cat:'phy'},
+  thundershock:{name:'Thundershock',type:'Electric',power:40,acc:100,pp:25,cat:'spec',effect:{status:'paralyze',chance:15}},
+  voltbolt:{name:'Volt Bolt',type:'Electric',power:75,acc:100,pp:15,cat:'spec',effect:{status:'paralyze',chance:12}},
+  rockthrow:{name:'Rock Throw',type:'Rock',power:50,acc:90,pp:15,cat:'phy'},
+  rockslide:{name:'Rock Slide',type:'Rock',power:78,acc:85,pp:10,cat:'phy'},
+  gust:{name:'Gust',type:'Flying',power:40,acc:100,pp:25,cat:'spec'},
+  aerialrush:{name:'Aerial Rush',type:'Flying',power:72,acc:95,pp:15,cat:'phy'},
+  bugbite:{name:'Bug Bite',type:'Bug',power:40,acc:100,pp:25,cat:'phy'},
+  xstrike:{name:'X-Strike',type:'Bug',power:68,acc:100,pp:15,cat:'phy'},
+  psybeam:{name:'Psybeam',type:'Psychic',power:45,acc:100,pp:20,cat:'spec'},
+  mindcrush:{name:'Mind Crush',type:'Psychic',power:75,acc:100,pp:15,cat:'spec'},
+  bite:{name:'Bite',type:'Dark',power:45,acc:100,pp:25,cat:'phy'},
+  shadowslash:{name:'Shadow Slash',type:'Dark',power:75,acc:100,pp:15,cat:'phy'},
+  harden:{name:'Harden',type:'Normal',power:0,acc:100,pp:30,cat:'status',effect:{stat:'def',amount:1,target:'self'}},
+  healpulse:{name:'Heal Pulse',type:'Normal',power:0,acc:100,pp:10,cat:'status',effect:{heal:0.25,target:'self'}},
+  swifttail:{name:'Swift Tail',type:'Normal',power:35,acc:100,pp:30,cat:'phy',priority:1}
+};
+
+/* ============================== ABILITIES ============================== */
+const ABILITY_NAMES = {blaze:'Blaze',torrent:'Torrent',overgrow:'Overgrow',swarm:'Swarm',sturdy:'Sturdy',
+  static:'Static',fluffy:'Fluffy',keeneye:'Keen Eye',insight:'Insight',illusion:'Illusion'};
+const ABILITY_DESC = {blaze:'Powers up Fire moves when HP is low.',torrent:'Powers up Water moves when HP is low.',
+  overgrow:'Powers up Grass moves when HP is low.',swarm:'Powers up Bug moves when HP is low.',
+  sturdy:'Cannot be knocked out in one hit from full HP.',static:'May paralyze on contact.',
+  fluffy:'Reduces physical damage taken.',keeneye:'Accuracy cannot be lowered.',
+  insight:'Sees through deception.',illusion:'Confuses those who underestimate it.'};
+const ABILITY_BOOST = {blaze:'Fire',torrent:'Water',overgrow:'Grass',swarm:'Bug'};
+
+/* ============================== SPECIES ============================== */
+// shape: circle, triangle, diamond, hex, square
+const SPECIES = {
+ 1:{id:1,name:'Sparkit',type1:'Electric',type2:null,base:{hp:30,atk:35,def:25,spd:70},shape:'circle',accessory:false,
+    ability:'static',catchRate:190,expYield:64,evoLevel:16,evoId:2,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'thundershock'},{lvl:14,m:'swifttail'},{lvl:22,m:'voltbolt'}]},
+ 2:{id:2,name:'Volturn',type1:'Electric',type2:null,base:{hp:55,atk:65,def:45,spd:105},shape:'circle',accessory:true,
+    ability:'static',catchRate:70,expYield:150,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'thundershock'},{lvl:14,m:'swifttail'},{lvl:22,m:'voltbolt'}]},
+ 3:{id:3,name:'Emberpup',type1:'Fire',type2:null,base:{hp:35,atk:45,def:30,spd:55},shape:'triangle',accessory:false,
+    ability:'blaze',catchRate:190,expYield:64,evoLevel:18,evoId:4,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'ember'},{lvl:14,m:'bite'},{lvl:24,m:'flamethrower'}]},
+ 4:{id:4,name:'Blazehound',type1:'Fire',type2:null,base:{hp:60,atk:82,def:50,spd:85},shape:'triangle',accessory:true,
+    ability:'blaze',catchRate:65,expYield:155,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'ember'},{lvl:14,m:'bite'},{lvl:24,m:'flamethrower'}]},
+ 5:{id:5,name:'Aquip',type1:'Water',type2:null,base:{hp:40,atk:35,def:40,spd:45},shape:'diamond',accessory:false,
+    ability:'torrent',catchRate:190,expYield:64,evoLevel:17,evoId:6,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'watergun'},{lvl:14,m:'harden'},{lvl:24,m:'aquatail'}]},
+ 6:{id:6,name:'Tidecoil',type1:'Water',type2:null,base:{hp:70,atk:62,def:72,spd:65},shape:'diamond',accessory:true,
+    ability:'torrent',catchRate:65,expYield:150,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'watergun'},{lvl:14,m:'harden'},{lvl:24,m:'aquatail'}]},
+ 7:{id:7,name:'Leaflit',type1:'Grass',type2:null,base:{hp:38,atk:38,def:35,spd:50},shape:'hex',accessory:false,
+    ability:'overgrow',catchRate:190,expYield:64,evoLevel:16,evoId:8,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'vinewhip'},{lvl:14,m:'healpulse'},{lvl:24,m:'leafblade'}]},
+ 8:{id:8,name:'Thornbloom',type1:'Grass',type2:null,base:{hp:65,atk:70,def:62,spd:70},shape:'hex',accessory:true,
+    ability:'overgrow',catchRate:65,expYield:150,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'vinewhip'},{lvl:14,m:'healpulse'},{lvl:24,m:'leafblade'}]},
+ 9:{id:9,name:'Pebblo',type1:'Rock',type2:null,base:{hp:45,atk:40,def:55,spd:25},shape:'square',accessory:false,
+    ability:'sturdy',catchRate:180,expYield:65,evoLevel:20,evoId:10,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'harden'},{lvl:8,m:'rockthrow'},{lvl:16,m:'bite'},{lvl:26,m:'rockslide'}]},
+ 10:{id:10,name:'Boulderon',type1:'Rock',type2:null,base:{hp:78,atk:78,def:98,spd:35},shape:'square',accessory:true,
+    ability:'sturdy',catchRate:60,expYield:158,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'harden'},{lvl:8,m:'rockthrow'},{lvl:16,m:'bite'},{lvl:26,m:'rockslide'}]},
+ 11:{id:11,name:'Flitterwing',type1:'Flying',type2:'Normal',base:{hp:32,atk:35,def:28,spd:66},shape:'triangle',accessory:false,
+    ability:'keeneye',catchRate:200,expYield:64,evoLevel:19,evoId:12,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'gust'},{lvl:15,m:'swifttail'},{lvl:25,m:'aerialrush'}]},
+ 12:{id:12,name:'Skyrend',type1:'Flying',type2:'Normal',base:{hp:56,atk:66,def:50,spd:104},shape:'triangle',accessory:true,
+    ability:'keeneye',catchRate:70,expYield:150,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'gust'},{lvl:15,m:'swifttail'},{lvl:25,m:'aerialrush'}]},
+ 13:{id:13,name:'Grubzy',type1:'Bug',type2:null,base:{hp:30,atk:40,def:30,spd:35},shape:'circle',accessory:false,
+    ability:'swarm',catchRate:220,expYield:55,evoLevel:12,evoId:14,
+    moves:[{lvl:1,m:'tackle'},{lvl:5,m:'bugbite'},{lvl:12,m:'harden'},{lvl:20,m:'xstrike'}]},
+ 14:{id:14,name:'Mothrazz',type1:'Bug',type2:'Flying',base:{hp:52,atk:62,def:48,spd:72},shape:'circle',accessory:true,
+    ability:'swarm',catchRate:75,expYield:140,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:5,m:'bugbite'},{lvl:12,m:'harden'},{lvl:20,m:'xstrike'},{lvl:28,m:'gust'}]},
+ 15:{id:15,name:'Psyfawn',type1:'Psychic',type2:null,base:{hp:33,atk:30,def:32,spd:55},shape:'diamond',accessory:false,
+    ability:'insight',catchRate:180,expYield:66,evoLevel:21,evoId:16,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'psybeam'},{lvl:16,m:'healpulse'},{lvl:26,m:'mindcrush'}]},
+ 16:{id:16,name:'Mindeer',type1:'Psychic',type2:null,base:{hp:58,atk:56,def:56,spd:92},shape:'diamond',accessory:true,
+    ability:'insight',catchRate:65,expYield:152,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'psybeam'},{lvl:16,m:'healpulse'},{lvl:26,m:'mindcrush'}]},
+ 17:{id:17,name:'Shadowhop',type1:'Dark',type2:null,base:{hp:34,atk:42,def:28,spd:58},shape:'circle',accessory:false,
+    ability:'illusion',catchRate:180,expYield:65,evoLevel:18,evoId:18,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'bite'},{lvl:16,m:'swifttail'},{lvl:26,m:'shadowslash'}]},
+ 18:{id:18,name:'Umbrake',type1:'Dark',type2:null,base:{hp:58,atk:80,def:48,spd:90},shape:'circle',accessory:true,
+    ability:'illusion',catchRate:65,expYield:153,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:7,m:'bite'},{lvl:16,m:'swifttail'},{lvl:26,m:'shadowslash'}]},
+ 19:{id:19,name:'Fluffkin',type1:'Normal',type2:null,base:{hp:42,atk:32,def:38,spd:40},shape:'square',accessory:false,
+    ability:'fluffy',catchRate:200,expYield:60,evoLevel:15,evoId:20,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'swifttail'},{lvl:14,m:'harden'},{lvl:22,m:'bite'}]},
+ 20:{id:20,name:'Bigfluff',type1:'Normal',type2:null,base:{hp:74,atk:60,def:66,spd:56},shape:'square',accessory:true,
+    ability:'fluffy',catchRate:70,expYield:145,evoLevel:null,evoId:null,
+    moves:[{lvl:1,m:'tackle'},{lvl:1,m:'growl'},{lvl:6,m:'swifttail'},{lvl:14,m:'harden'},{lvl:22,m:'bite'}]}
+};
+
+/* ============================== ITEMS ============================== */
+const ITEMS = {
+  potion:{name:'Potion',desc:'Restores 25 HP.',price:200,type:'heal',amount:25},
+  superpotion:{name:'Super Potion',desc:'Restores 60 HP.',price:500,type:'heal',amount:60},
+  revive:{name:'Revive',desc:'Revives a fainted monster with half HP.',price:600,type:'revive'},
+  cureall:{name:'Cure-All Herb',desc:'Cures any status condition.',price:250,type:'cure'},
+  snareorb:{name:'Snare Orb',desc:'A basic capture device.',price:150,type:'ball',mult:1},
+  greatorb:{name:'Great Orb',desc:'A capture device with a higher success rate.',price:400,type:'ball',mult:1.6},
+  ultraorb:{name:'Ultra Orb',desc:'A premium capture device.',price:900,type:'ball',mult:2.5},
+  herbaltonic:{name:'Herbal Tonic',desc:'A fragrant tonic. Someone might want this.',price:100,type:'quest'},
+  tidecharm:{name:'Tide Charm',desc:'Reveals hidden things near water.',price:0,type:'keyquest'}
+};
+
+/* ============================== MAP BUILDER ============================== */
+function makeMap(w,h,fill){
+  const g=[];
+  for(let y=0;y<h;y++){
+    const row=[];
+    for(let x=0;x<w;x++){
+      if(x===0||y===0||x===w-1||y===h-1) row.push('#');
+      else row.push(fill);
+    }
+    g.push(row);
+  }
+  return g;
+}
+function setRect(g,x1,y1,x2,y2,ch){ for(let y=y1;y<=y2;y++) for(let x=x1;x<=x2;x++){ if(g[y]&&g[y][x]!==undefined) g[y][x]=ch; } }
+function setTile(g,x,y,ch){ if(g[y]&&g[y][x]!==undefined) g[y][x]=ch; }
+
+const TILE_INFO = {
+  '#':{walk:false,color:'#0e2a12'},
+  '.':{walk:true,color:'#3a6b3a'},
+  ',':{walk:true,color:'#2f7d3a',encounter:true},
+  '~':{walk:false,color:'#2255aa'},
+  '^':{walk:true,color:'#d9c07a',encounter:true},
+  'C':{walk:true,color:'#463a52',encounter:true,dark:true},
+  'N':{walk:false,color:'#555',sign:true},
+  'L':{walk:true,color:'#8a6a3a',door:true},
+  'S':{walk:true,color:'#7a5a9a',door:true},
+  'G':{walk:true,color:'#aa4444',door:true},
+  'R':{walk:true,color:'#3a6b3a',door:true},
+  'B':{walk:true,color:'#d9c07a',door:true},
+  'V':{walk:true,color:'#463a52',door:true},
+  'H':{walk:true,color:'#3a6b3a',door:true},
+  'X':{walk:true,color:'#221830',door:true,gate:true}
+};
+
+/* ---- Build world maps ---- */
+const MAPS = {};
+
+// HOLLOW (town)
+(function(){
+  const g = makeMap(16,12,'.');
+  setRect(g,7,5,8,6,'~');
+  setTile(g,3,2,'L'); setTile(g,10,2,'S'); setTile(g,6,8,'G');
+  setTile(g,12,4,'N'); setTile(g,4,7,'N');
+  setTile(g,8,11,'R');
+  MAPS.hollow = {
+    name:'Starlight Hollow (Town)', grid:g, weatherBias:['Clear','Clear','Rain'],
+    encounters:[], // town: no wild encounters
+    doors:{'3,2':{type:'lab'}, '10,2':{type:'shop',shopId:'mart1'}, '6,8':{type:'gym',gymId:'gym1'},
+      '8,11':{type:'transition',to:'whisperwood',x:8,y:1}},
+    signs:{'12,4':'A weathered signpost: "Whisperwood Route -> South"','4,7':'A flowerbed. It smells nice.'},
+    npcs:[
+      {id:'nurse',x:9,y:8,name:'Nurse Wren',color:'#e07fae',dialogue:['Welcome to Starlight Hollow!','Let me heal your team right up.'],heal:true},
+      {id:'cobb',x:3,y:7,name:'Old Man Cobb',color:'#a08860',dialogue:[],quest:'lostgrubzy'}
+    ]
+  };
+})();
+
+// WHISPERWOOD (route/forest)
+(function(){
+  const g = makeMap(18,14,',');
+  setRect(g,2,2,15,11,','); // ensure interior grass
+  // carve a path
+  for(let x=1;x<17;x++) setTile(g,x,6,'.');
+  for(let y=1;y<13;y++) setTile(g,8,y,'.');
+  setRect(g,3,9,5,10,'~');
+  setTile(g,8,0,'H');
+  setTile(g,17,7,'B');
+  setTile(g,9,13,'V');
+  MAPS.whisperwood = {
+    name:'Whisperwood', grid:g, weatherBias:['Clear','Rain','Fog'],
+    encounters:[
+      {species:1,w:20,min:3,max:6},{species:3,w:15,min:3,max:6},{species:5,w:15,min:3,max:6},
+      {species:7,w:20,min:3,max:6},{species:13,w:20,min:2,max:5},{species:11,w:12,min:3,max:6},
+      {species:19,w:10,min:3,max:6}
+    ],
+    doors:{'8,0':{type:'transition',to:'hollow',x:8,y:10}, '17,7':{type:'transition',to:'tidecrest',x:1,y:6},
+      '9,13':{type:'transition',to:'glimmercave',x:8,y:1}},
+    signs:{},
+    hidden:{'14,3':{item:'snareorb',qty:3,flag:'hidden_ww1'}},
+    npcs:[
+      {id:'rivalRoute',x:8,y:3,name:'Vex',color:'#7a4fae',trainer:true,
+        team:[{species:17,level:5}], money:80,
+        pre:["Oh? You actually picked a partner from the Professor.","Let's see if you're any good. Don't hold back!"],
+        post:["Tch. Not bad. This isn't over."], flagKey:'rivalRouteDone', scripted:true},
+      {id:'finn',x:5,y:9,name:'Bug Catcher Finn',color:'#7aa03a',trainer:true,
+        team:[{species:13,level:7}], money:70,
+        pre:['My Grubzy is stronger than it looks!'], post:['Aw, squashed.']},
+      {id:'bram',x:12,y:8,name:'Hiker Bram',color:'#8a6a3a',trainer:true,
+        team:[{species:9,level:9},{species:9,level:10}], money:140,
+        pre:['These rocks took years to train!'], post:['Solid battle, traveler.']},
+      {id:'mira',x:4,y:5,name:'Bird Watcher Mira',color:'#4aa0d0',dialogue:[],quest:'birdwatcher'}
+    ]
+  };
+})();
+
+// TIDECREST (beach)
+(function(){
+  const g = makeMap(16,12,'^');
+  setRect(g,1,8,14,10,'~');
+  for(let x=1;x<15;x++) setTile(g,x,4,'.');
+  setTile(g,1,6,'H');
+  setTile(g,3,2,'N');
+  MAPS.tidecrest = {
+    name:'Tidecrest Shore', grid:g, weatherBias:['Clear','Clear','Rain'],
+    encounters:[
+      {species:5,w:30,min:4,max:8},{species:11,w:15,min:4,max:7},{species:19,w:15,min:4,max:7},
+      {species:1,w:10,min:4,max:7}
+    ],
+    doors:{'1,6':{type:'transition',to:'whisperwood',x:16,y:7}},
+    signs:{'3,2':'A rusty lighthouse looms ahead.'},
+    hidden:{'12,3':{item:'rareSpot',flag:'tidecharm',needFlag:'tidecharm'}},
+    npcs:[
+      {id:'toma',x:10,y:3,name:'Keeper Toma',color:'#c9a05a',dialogue:[],quest:'lighthouse'},
+      {id:'reef',x:6,y:7,name:'Sailor Reef',color:'#3a7ab0',trainer:true,
+        team:[{species:5,level:10},{species:5,level:10}], money:150,
+        pre:['The sea taught me everything!'], post:['Ahh, bested by a landlubber.']}
+    ]
+  };
+})();
+
+// GLIMMERCAVE
+(function(){
+  const g = makeMap(16,18,'C');
+  setRect(g,4,4,6,4,'#'); setRect(g,10,6,12,6,'#'); setRect(g,3,10,5,10,'#'); setRect(g,9,12,11,12,'#');
+  setTile(g,8,0,'H');
+  setTile(g,8,16,'X'); // ancient chamber gate
+  MAPS.glimmercave = {
+    name:'Glimmer Cave', grid:g, weatherBias:['Fog','Fog','Clear'],
+    encounters:[
+      {species:9,w:25,min:6,max:10},{species:13,w:20,min:6,max:10},{species:17,w:20,min:6,max:10},
+      {species:15,w:12,min:8,max:12},{species:15,w:6,min:14,max:16,night:true}
+    ],
+    doors:{'8,0':{type:'transition',to:'whisperwood',x:9,y:12},
+      '8,16':{type:'gate',need:['badge1','badge2'],msg:'The chamber hums with sealed energy. Both badges are needed to proceed.',to:'ancientchamber',x:4,y:6}},
+    signs:{},
+    hidden:{},
+    npcs:[
+      {id:'dara',x:6,y:8,name:'Spelunker Dara',color:'#8a6a9a',trainer:true,
+        team:[{species:13,level:12},{species:17,level:12}], money:180,
+        pre:["It's dark down here, perfect for my team."], post:['Guess I need a bigger lantern.']},
+      {id:'nyx',x:8,y:14,name:'Leader Nyx',color:'#2a1a3a',trainer:true,leader:true,badge:'badge2',badgeName:'Duskveil Badge',
+        team:[{species:17,level:20},{species:17,level:23},{species:18,level:27}], money:600,
+        pre:["Few reach this deep.","Let's see if you deserve to pass, challenger."],
+        post:["...Impressive. Take this badge, and passage."], flagKey:'gym2Won'}
+    ]
+  };
+})();
+
+// ANCIENT CHAMBER (final)
+(function(){
+  const g = makeMap(9,9,'.');
+  setTile(g,4,7,'H');
+  MAPS.ancientchamber = {
+    name:'Ancient Chamber', grid:g, weatherBias:['Clear'],
+    encounters:[],
+    doors:{'4,7':{type:'transition',to:'glimmercave',x:8,y:15}},
+    signs:{},
+    npcs:[
+      {id:'rivalFinal',x:4,y:2,name:'Vex',color:'#7a4fae',trainer:true,final:true,
+        team:[{species:18,level:28},{species:10,level:26},{species:16,level:27}], money:0,
+        pre:["So you made it, badges and all.","This is it. Everything we've trained for. GO!"],
+        post:["..."], flagKey:'rivalFinalDone'}
+    ]
+  };
+})();
+
+// GYM1 interior
+(function(){
+  const g = makeMap(10,8,'.');
+  setTile(g,5,7,'H');
+  MAPS.gym1 = {
+    name:'Stonehide Gym', grid:g, weatherBias:['Clear'],
+    encounters:[],
+    doors:{'5,7':{type:'transition',to:'hollow',x:6,y:9}},
+    signs:{},
+    npcs:[
+      {id:'rook',x:5,y:1,name:'Leader Rook',color:'#8a6a3a',trainer:true,leader:true,badge:'badge1',badgeName:'Stonehide Badge',
+        team:[{species:9,level:15},{species:9,level:18},{species:10,level:22}], money:500,
+        pre:["I am Rook, master of Rock-type Aurelians.","Show me your resolve!"],
+        post:["Hah! You've earned this badge fairly."], flagKey:'gym1Won'}
+    ]
+  };
+})();
+
+/* ============================== QUESTS ============================== */
+const QUEST_DEFS = {
+  starter:{title:'A New Beginning',desc:'Visit the Lab in Starlight Hollow and choose your first partner monster.'},
+  rivalroute:{title:"The Rival's Test",desc:'Vex is waiting somewhere in Whisperwood.'},
+  birdwatcher:{title:"Mira's Request",desc:'Catch a Flying-type Aurelian and show it to Bird Watcher Mira in Whisperwood.'},
+  lighthouse:{title:'Medicine for the Keeper',desc:'Buy a Herbal Tonic from the Hollow Mart and bring it to Keeper Toma on Tidecrest Shore.'},
+  lostgrubzy:{title:"Cobb's Lost Grubzy",desc:'Old Man Cobb lost his pet Grubzy in Whisperwood. Catch one and show him.'},
+  gym1:{title:'Stonehide Trial',desc:'Challenge Leader Rook at the Stonehide Gym in Starlight Hollow.'},
+  gym2:{title:'Into the Dark',desc:'Venture into Glimmer Cave and challenge Leader Nyx.'},
+  finalrival:{title:"The Rival's Challenge",desc:'With both badges earned, find Vex in the Ancient Chamber beyond Glimmer Cave.'}
+};
+
+/* ============================== GAME STATE ============================== */
+let STATE = null;
+function freshState(){
+  return {
+    map:'hollow', x:8, y:9, dir:'down',
+    party:[], storage:[], inventory:{potion:3,snareorb:5},
+    money:500, badges:[], flags:{}, quests:[{id:'starter',status:'active'}],
+    dex:[], time:8*60, weatherByMap:{}, settings:{musicOn:true,sfxOn:true},
+    inBattle:false, playtime:0
+  };
+}
+function isNight(){ const h=Math.floor((STATE.time/60)%24); return h<6 || h>=19; }
+function timeStr(){ const h=Math.floor((STATE.time/60)%24), m=Math.floor(STATE.time%60); return (h<10?'0':'')+h+':'+(m<10?'0':'')+m; }
+
+/* ============================== MONSTER FACTORY ============================== */
+function calcStats(species,level){
+  const b=species.base;
+  return {
+    maxHp: Math.floor(b.hp + level*3 + 10),
+    atk: Math.floor(b.atk + level*2),
+    def: Math.floor(b.def + level*2),
+    spd: Math.floor(b.spd + level*1.6)
+  };
+}
+function movesForLevel(species,level){
+  const learned = species.moves.filter(m=>m.lvl<=level).map(m=>m.m);
+  const last4 = learned.slice(-4);
+  return last4.map(m=>({id:m, pp:MOVES[m].pp, maxPp:MOVES[m].pp}));
+}
+function xpToNext(level){ return Math.floor(level*level*4 + 40); }
+function createMonster(speciesId, level, opts){
+  opts=opts||{};
+  const sp = SPECIES[speciesId];
+  const stats = calcStats(sp,level);
+  const shiny = opts.shiny!==undefined?opts.shiny:chance(1.5);
+  const mon = {
+    uid: uid(), species: speciesId, nickname: sp.name, level, xp:0, xpNext:xpToNext(level),
+    maxHp: stats.maxHp, hp: stats.maxHp, atk: stats.atk, def: stats.def, spd: stats.spd,
+    moves: movesForLevel(sp,level), status:null, statStages:{atk:0,def:0},
+    ability: sp.ability, shiny, sturdyUsed:false
+  };
+  if(!STATE.dex.includes(speciesId)) STATE.dex.push(speciesId);
+  return mon;
+}
+function statMult(stage){ const table={'-2':0.6,'-1':0.8,'0':1,'1':1.4,'2':1.8}; return table[String(clamp(stage,-2,2))]; }
+
+/* ============================== EXPLORATION RENDER ============================== */
+const canvas = document.getElementById('map-canvas');
+const ctx = canvas.getContext('2d');
+const TILE = 32, VIEW_W = 15, VIEW_H = 11;
+const weatherCanvas = document.getElementById('weather-overlay');
+const wctx = weatherCanvas.getContext('2d');
+
+let playerAnim = {moving:false, fromX:0, fromY:0, t:0};
+let stepToggle = 0;
+
+function drawShape(c, shape, color, size, accessory, cx, cy){
+  c.fillStyle = color; c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth=2;
+  c.beginPath();
+  if(shape==='circle'){ c.arc(cx,cy,size/2,0,Math.PI*2); }
+  else if(shape==='square'){ c.rect(cx-size/2,cy-size/2,size,size); }
+  else if(shape==='diamond'){ c.moveTo(cx,cy-size/2); c.lineTo(cx+size/2,cy); c.lineTo(cx,cy+size/2); c.lineTo(cx-size/2,cy); c.closePath(); }
+  else if(shape==='triangle'){ c.moveTo(cx,cy-size/2); c.lineTo(cx+size/2,cy+size/2); c.lineTo(cx-size/2,cy+size/2); c.closePath(); }
+  else if(shape==='hex'){
+    for(let i=0;i<6;i++){ const a=Math.PI/3*i-Math.PI/2; const px=cx+Math.cos(a)*size/2, py=cy+Math.sin(a)*size/2; if(i===0)c.moveTo(px,py); else c.lineTo(px,py); }
+    c.closePath();
+  }
+  c.fill(); c.stroke();
+  // eyes
+  c.fillStyle='#111';
+  c.beginPath(); c.arc(cx-size*0.14,cy-size*0.05,size*0.06,0,Math.PI*2); c.fill();
+  c.beginPath(); c.arc(cx+size*0.14,cy-size*0.05,size*0.06,0,Math.PI*2); c.fill();
+  if(accessory){
+    c.strokeStyle=color; c.lineWidth=3;
+    c.beginPath(); c.moveTo(cx-size*0.3,cy-size*0.5); c.lineTo(cx-size*0.45,cy-size*0.75); c.stroke();
+    c.beginPath(); c.moveTo(cx+size*0.3,cy-size*0.5); c.lineTo(cx+size*0.45,cy-size*0.75); c.stroke();
+  }
+}
+function drawMonsterIcon(canvasEl, mon){
+  const c = canvasEl.getContext('2d');
+  c.clearRect(0,0,canvasEl.width,canvasEl.height);
+  const sp = SPECIES[mon.species];
+  let color = TYPE_COLORS[sp.type1];
+  if(mon.shiny) color = '#f2c14e';
+  drawShape(c, sp.shape, color, canvasEl.width*0.62, sp.accessory, canvasEl.width/2, canvasEl.height/2+4);
+  if(sp.type2){ c.fillStyle=TYPE_COLORS[sp.type2]; c.globalAlpha=0.5; c.beginPath(); c.arc(canvasEl.width/2, canvasEl.height*0.22, canvasEl.width*0.12,0,Math.PI*2); c.fill(); c.globalAlpha=1; }
+}
+
+function currentMap(){ return MAPS[STATE.map]; }
+
+function renderMap(){
+  const m = currentMap();
+  const g = m.grid;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  let camX = clamp(STATE.x - Math.floor(VIEW_W/2), 0, g[0].length-VIEW_W);
+  let camY = clamp(STATE.y - Math.floor(VIEW_H/2), 0, g.length-VIEW_H);
+  if(g[0].length<VIEW_W) camX=0; if(g.length<VIEW_H) camY=0;
+  for(let vy=0; vy<VIEW_H; vy++){
+    for(let vx=0; vx<VIEW_W; vx++){
+      const mx=camX+vx, my=camY+vy;
+      const ch = (g[my]&&g[my][mx])||'#';
+      const info = TILE_INFO[ch]||TILE_INFO['#'];
+      ctx.fillStyle = info.color;
+      ctx.fillRect(vx*TILE, vy*TILE, TILE, TILE);
+      // texture accents
+      if(ch===','){ ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.beginPath(); ctx.moveTo(vx*TILE+8,vy*TILE+26); ctx.lineTo(vx*TILE+8,vy*TILE+14); ctx.moveTo(vx*TILE+22,vy*TILE+28); ctx.lineTo(vx*TILE+22,vy*TILE+16); ctx.stroke(); }
+      if(ch==='#'){ ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(vx*TILE+4,vy*TILE+4,TILE-8,TILE-8); }
+      if(ch==='~'){ ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.beginPath(); ctx.moveTo(vx*TILE+4,vy*TILE+16); ctx.lineTo(vx*TILE+28,vy*TILE+16); ctx.stroke(); }
+      if(info.door){ ctx.fillStyle='rgba(255,255,255,.18)'; ctx.fillRect(vx*TILE+6,vy*TILE+6,TILE-12,TILE-12); }
+    }
+  }
+  // hidden markers (subtle sparkle if flag not consumed) - very subtle, not obviously "marked"
+  // NPCs
+  for(const npc of m.npcs){
+    const vx = npc.x-camX, vy = npc.y-camY;
+    if(vx<0||vy<0||vx>=VIEW_W||vy>=VIEW_H) continue;
+    if(npc.trainer && npc.flagKey && STATE.flags[npc.flagKey] && !npc.leader && !npc.final) continue; // defeated regular trainers disappear? keep simpler: still there
+    drawPersonSprite(ctx, vx*TILE+TILE/2, vy*TILE+TILE/2, npc.color, 'down');
+    ctx.fillStyle='#fff'; ctx.font='9px monospace'; ctx.textAlign='center';
+    ctx.fillText(npc.name, vx*TILE+TILE/2, vy*TILE-3);
+  }
+  // player
+  const pvx = (STATE.x-camX)*TILE+TILE/2, pvy=(STATE.y-camY)*TILE+TILE/2;
+  drawPersonSprite(ctx, pvx, pvy, '#f2f2f2', STATE.dir, true);
+
+  // day/night overlay
+  const t = STATE.time%1440;
+  let dark=0;
+  if(t<300) dark=0.55; else if(t<360) dark=0.55*(1-(t-300)/60); else if(t<1140) dark=0; else if(t<1200) dark=0.55*((t-1140)/60); else dark=0.55;
+  if(currentMap()===MAPS.glimmercave) dark = Math.max(dark,0.35);
+  if(dark>0){ ctx.fillStyle='rgba(10,10,40,'+dark+')'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+
+  renderWeather();
+}
+function drawPersonSprite(c,cx,cy,color,dir,isPlayer){
+  c.fillStyle=color;
+  c.fillRect(cx-8,cy-4,16,16); // body
+  c.fillStyle='#e8c39e';
+  c.beginPath(); c.arc(cx,cy-8,7,0,Math.PI*2); c.fill(); // head
+  c.fillStyle='#333';
+  if(dir==='left'){ c.fillRect(cx-9,cy-9,3,3); }
+  else if(dir==='right'){ c.fillRect(cx+6,cy-9,3,3); }
+  else { c.fillRect(cx-4,cy-9,3,3); c.fillRect(cx+1,cy-9,3,3); }
+  if(isPlayer){ c.strokeStyle='rgba(255,255,255,.4)'; c.strokeRect(cx-8,cy-4,16,16); }
+}
+let weatherParticles = [];
+function ensureWeather(){
+  const m = currentMap();
+  if(!STATE.weatherByMap[STATE.map] || STATE.weatherByMap[STATE.map].expires < Date.now()){
+    const w = weightedPick(m.weatherBias.map(w=>({w:1,val:w})));
+    STATE.weatherByMap[STATE.map] = {type:w.val, expires: Date.now()+90000};
+    weatherParticles = [];
+    const n = w.val==='Rain'?60:(w.val==='Fog'?0:0);
+    for(let i=0;i<n;i++) weatherParticles.push({x:Math.random()*480,y:Math.random()*352,s:2+Math.random()*3});
+  }
+  return STATE.weatherByMap[STATE.map].type;
+}
+function renderWeather(){
+  const w = ensureWeather();
+  wctx.clearRect(0,0,480,352);
+  if(w==='Rain'){
+    wctx.strokeStyle='rgba(180,210,255,.5)'; wctx.lineWidth=1.5;
+    for(const p of weatherParticles){
+      wctx.beginPath(); wctx.moveTo(p.x,p.y); wctx.lineTo(p.x-3,p.y+10); wctx.stroke();
+      p.y+=p.s*3; p.x-=1; if(p.y>352){p.y=-10;p.x=Math.random()*480;}
+    }
+  } else if(w==='Fog'){
+    wctx.fillStyle='rgba(200,200,210,.16)'; wctx.fillRect(0,0,480,352);
+  }
+  document.getElementById('hud-weather').textContent = (isNight()?'🌙 ':'☀️ ')+w+(currentMap()===MAPS.glimmercave?' (dark)':'');
+}
+
+/* ============================== HUD ============================== */
+function updateHUD(){
+  document.getElementById('hud-location').textContent = currentMap().name+'  '+timeStr();
+  document.getElementById('hud-money').textContent = '💰'+STATE.money;
+}
+
+/* ============================== MOVEMENT / INTERACTION ============================== */
+const DIRS = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+let modalOpen=false;
+
+function npcAt(x,y){ return currentMap().npcs.find(n=>n.x===x&&n.y===y); }
+function tileWalkable(x,y){
+  const g=currentMap().grid;
+  if(!g[y]||g[y][x]===undefined) return false;
+  const ch=g[y][x];
+  if(!TILE_INFO[ch] || !TILE_INFO[ch].walk) return false;
+  if(npcAt(x,y)) return false;
+  return true;
+}
+function tryMove(dir){
+  if(modalOpen || STATE.inBattle || dialogueActive) return;
+  STATE.dir = dir;
+  const [dx,dy] = DIRS[dir];
+  const nx = STATE.x+dx, ny = STATE.y+dy;
+  if(tileWalkable(nx,ny)){
+    STATE.x=nx; STATE.y=ny;
+    STATE.time += 4;
+    Audio_.move();
+    afterStep();
+  }
+  renderMap(); updateHUD();
+}
+function afterStep(){
+  const m = currentMap();
+  const ch = m.grid[STATE.y][STATE.x];
+  const info = TILE_INFO[ch];
+  // hidden pickups
+  const hidKey = STATE.x+','+STATE.y;
+  if(m.hidden && m.hidden[hidKey]){
+    const hd = m.hidden[hidKey];
+    if(hd.needFlag && !STATE.flags[hd.needFlag]){ /* not ready */ }
+    else if(hd.flag && !STATE.flags[hd.flag]){
+      STATE.flags[hd.flag]=true;
+      if(hd.item==='rareSpot'){
+        showToast('The tide reveals something shimmering...');
+        startWildBattle(pick([2,4,6,8]), rnd(18,20), {rare:true});
+        return;
+      } else {
+        STATE.inventory[hd.item] = (STATE.inventory[hd.item]||0) + (hd.qty||1);
+        showToast('Found '+ITEMS[hd.item].name+' x'+(hd.qty||1)+'!');
+      }
+    }
+  }
+  if(info && info.encounter){
+    let rate = 10;
+    if(currentMap()===MAPS.glimmercave) rate = 12;
+    ensureWeather();
+    if(STATE.weatherByMap[STATE.map].type==='Fog') rate += 4;
+    if(STATE.repelSteps>0){ STATE.repelSteps--; return; }
+    if(chance(rate)){
+      const table = m.encounters.filter(e=> !e.night || isNight());
+      const chosen = weightedPick(table);
+      const lvl = rnd(chosen.min,chosen.max);
+      startWildBattle(chosen.species, lvl);
+    }
+  }
+}
+function faceTile(){
+  const [dx,dy]=DIRS[STATE.dir];
+  return {x:STATE.x+dx, y:STATE.y+dy};
+}
+function interact(){
+  if(STATE.inBattle) return;
+  if(dialogueActive){ advanceDialogue(); return; }
+  if(modalOpen) return;
+  const f = faceTile();
+  const npc = npcAt(f.x,f.y);
+  if(npc){ Audio_.click(); talkToNpc(npc); return; }
+  const m = currentMap();
+  const doorKey = f.x+','+f.y;
+  if(m.signs[doorKey]){ showDialogue([{name:'Sign', text:m.signs[doorKey]}]); return; }
+  const meDoorKey = STATE.x+','+STATE.y;
+  const door = m.doors[meDoorKey];
+  if(door){ handleDoor(door); }
+}
+function handleDoor(door){
+  if(door.type==='transition'){
+    STATE.map = door.to; STATE.x=door.x; STATE.y=door.y;
+    renderMap(); updateHUD();
+  } else if(door.type==='lab'){
+    labDialogue();
+  } else if(door.type==='shop'){
+    openShop(door.shopId);
+  } else if(door.type==='gym'){
+    STATE.map='gym1'; STATE.x=5; STATE.y=6; renderMap(); updateHUD();
+  } else if(door.type==='gate'){
+    const ok = door.need.every(f=>STATE.flags[f]);
+    if(ok){ STATE.map=door.to; STATE.x=door.x; STATE.y=door.y; renderMap(); updateHUD(); }
+    else { showDialogue([{name:'', text:door.msg}]); }
+  }
+}
+// re-check door on movement too (walking onto exit tile at map edge should also trigger automatically)
+const _origTryMove = tryMove;
+tryMove = function(dir){
+  if(modalOpen || STATE.inBattle || dialogueActive) return;
+  STATE.dir = dir;
+  const [dx,dy] = DIRS[dir];
+  const nx = STATE.x+dx, ny = STATE.y+dy;
+  if(tileWalkable(nx,ny)){
+    STATE.x=nx; STATE.y=ny;
+    STATE.time += 4;
+    Audio_.move();
+    afterStep();
+    const m = currentMap();
+    const key = STATE.x+','+STATE.y;
+    if(m.doors[key] && (m.doors[key].type==='transition')){ handleDoor(m.doors[key]); }
+  }
+  renderMap(); updateHUD();
+};
+
+/* ============================== DIALOGUE SYSTEM ============================== */
+let dialogueActive=false, dialogueQueue=[], dialogueCallback=null;
+const dqBox=document.getElementById('dialogue-box'), dqName=document.getElementById('dq-name'), dqText=document.getElementById('dq-text'), dqChoices=document.getElementById('dialogue-choices'), dqNext=document.getElementById('dq-next');
+function showDialogue(lines, cb){
+  dialogueActive=true; dialogueQueue=lines.slice(); dialogueCallback=cb||null;
+  dqBox.classList.remove('hidden'); dqChoices.innerHTML=''; dqNext.classList.remove('hidden');
+  nextLine();
+}
+function nextLine(){
+  if(dialogueQueue.length===0){
+    dqBox.classList.add('hidden'); dialogueActive=false;
+    const cb=dialogueCallback; dialogueCallback=null;
+    if(cb) cb();
+    return;
+  }
+  const line = dialogueQueue.shift();
+  dqName.textContent = line.name||'';
+  dqText.textContent = line.text;
+  if(line.choices){
+    dqNext.classList.add('hidden');
+    dqChoices.innerHTML='';
+    line.choices.forEach(ch=>{
+      const b=document.createElement('button');
+      b.textContent = ch.label;
+      b.onclick=()=>{ dqChoices.innerHTML=''; ch.action(); if(!ch.keepOpen) nextLine(); };
+      dqChoices.appendChild(b);
+    });
+  } else {
+    dqChoices.innerHTML=''; dqNext.classList.remove('hidden');
+  }
+}
+function advanceDialogue(){
+  if(dqChoices.children.length>0) return;
+  Audio_.click();
+  nextLine();
+}
+
+/* ============================== NPC TALK / QUESTS ============================== */
+function questStatus(id){ const q=STATE.quests.find(q=>q.id===id); return q?q.status:null; }
+function addQuest(id){ if(!STATE.quests.find(q=>q.id===id)) STATE.quests.push({id,status:'active'}); }
+function completeQuest(id){ const q=STATE.quests.find(q=>q.id===id); if(q) q.status='done'; }
+
+function hasSpeciesCaught(id){ return STATE.party.concat(STATE.storage).some(m=>m.species===id); }
+
+function talkToNpc(npc){
+  if(npc.heal){
+    showDialogue([{name:npc.name,text:npc.dialogue[0]},{name:npc.name,text:npc.dialogue[1]}], ()=>{
+      STATE.party.forEach(m=>{ m.hp=m.maxHp; m.status=null; });
+      Audio_.heal(); showToast('Your team is fully healed!');
+    });
+    return;
+  }
+  if(npc.quest){ handleQuestNpc(npc); return; }
+  if(npc.trainer){
+    if(npc.flagKey && STATE.flags[npc.flagKey] && !npc.leader && !npc.final){
+      showDialogue([{name:npc.name,text:pick(npc.post)}]);
+      return;
+    }
+    if(npc.final && STATE.flags[npc.flagKey]){
+      showDialogue([{name:npc.name,text:'...We already had our battle.'}]);
+      return;
+    }
+    if(npc.scripted && STATE.flags[npc.flagKey]){
+      showDialogue([{name:npc.name,text:pick(npc.post)}]);
+      return;
+    }
+    showDialogue(npc.pre.map(t=>({name:npc.name,text:t})), ()=>{ startTrainerBattle(npc); });
+    return;
+  }
+  showDialogue([{name:npc.name,text:'...'}]);
+}
+function handleQuestNpc(npc){
+  if(npc.quest==='birdwatcher'){
+    if(questStatus('birdwatcher')==='done'){ showDialogue([{name:npc.name,text:'Keep an eye on the skies!'}]); return; }
+    if(!questStatus('birdwatcher')) addQuest('birdwatcher');
+    const has = hasSpeciesCaught(11)||hasSpeciesCaught(12);
+    if(has){
+      showDialogue([{name:npc.name,text:"You caught a Flying-type! Wonderful!"},{name:npc.name,text:'Here, take these as thanks.'}], ()=>{
+        STATE.inventory.greatorb=(STATE.inventory.greatorb||0)+3; STATE.money+=300;
+        completeQuest('birdwatcher'); Audio_.money(); showToast('Received 3 Great Orbs and 300 coins!');
+      });
+    } else {
+      showDialogue([{name:npc.name,text:'I study Flying-types around here.'},{name:npc.name,text:'Catch one and show me, would you?'}]);
+    }
+  } else if(npc.quest==='lighthouse'){
+    if(questStatus('lighthouse')==='done'){ showDialogue([{name:npc.name,text:'Thanks again for the tonic!'}]); return; }
+    if(!questStatus('lighthouse')) addQuest('lighthouse');
+    if(STATE.inventory.herbaltonic>0){
+      showDialogue([{name:npc.name,text:'Is that... a Herbal Tonic? My back thanks you!'},{name:npc.name,text:'Take this Tide Charm - it reveals hidden things near water.'}], ()=>{
+        STATE.inventory.herbaltonic--; STATE.flags.tidecharm=true; completeQuest('lighthouse');
+        showToast('Received the Tide Charm!');
+      });
+    } else {
+      showDialogue([{name:npc.name,text:'Oh, my back is aching...'},{name:npc.name,text:'If only I had a Herbal Tonic. The Hollow Mart sells them.'}]);
+    }
+  } else if(npc.quest==='lostgrubzy'){
+    if(questStatus('lostgrubzy')==='done'){ showDialogue([{name:npc.name,text:'Thanks for finding my little buddy!'}]); return; }
+    if(!questStatus('lostgrubzy')) addQuest('lostgrubzy');
+    if(hasSpeciesCaught(13)||hasSpeciesCaught(14)){
+      showDialogue([{name:npc.name,text:'You found a Grubzy! It must be a relative of mine!'},{name:npc.name,text:'Here, take these potions.'}], ()=>{
+        STATE.inventory.potion=(STATE.inventory.potion||0)+5; STATE.money+=150; completeQuest('lostgrubzy');
+        showToast('Received 5 Potions and 150 coins!');
+      });
+    } else {
+      showDialogue([{name:npc.name,text:'My pet Grubzy wandered into Whisperwood...'},{name:npc.name,text:'Could you find one and bring it to me?'}]);
+    }
+  }
+}
+function labDialogue(){
+  if(STATE.party.length===0){
+    showDialogue([
+      {name:'Professor Talin',text:'Ah, a new adventurer! Welcome to my lab.'},
+      {name:'Professor Talin',text:'Choose your first partner Aurelian.',
+        choices:[
+          {label:'Emberpup (Fire)',action:()=>chooseStarter(3)},
+          {label:'Aquip (Water)',action:()=>chooseStarter(5)},
+          {label:'Leaflit (Grass)',action:()=>chooseStarter(7)}
+        ]}
+    ]);
+  } else {
+    showDialogue([{name:'Professor Talin',text:'How is your journey going? Good luck out there!'}]);
+  }
+}
+function chooseStarter(speciesId){
+  const mon = createMonster(speciesId, 5, {shiny:false});
+  STATE.party.push(mon);
+  completeQuest('starter'); addQuest('rivalroute');
+  showDialogue([{name:'Professor Talin',text:'Take good care of your '+SPECIES[speciesId].name+'!'},
+    {name:'Professor Talin',text:'Head south into Whisperwood to begin your adventure.'}], ()=>{
+      STATE.inventory.snareorb=(STATE.inventory.snareorb||0)+5;
+      showToast('Received 5 Snare Orbs!');
+    });
+}
+
+/* ============================== SHOP ============================== */
+function openShop(shopId){
+  modalOpen=true;
+  const ov=document.getElementById('overlay');
+  const stock = ['potion','superpotion','revive','cureall','snareorb','greatorb','ultraorb','herbaltonic'];
+  let html = '<button class="ov-close" id="ov-close">X</button><h2>Hollow Mart — 💰'+STATE.money+'</h2>';
+  stock.forEach(id=>{
+    const it=ITEMS[id];
+    html += '<div class="shop-row"><div><b>'+it.name+'</b><br><span style="color:var(--muted)">'+it.desc+'</span></div>'+
+      '<div style="text-align:right"><div>'+it.price+'c</div><button class="gamebtn" data-buy="'+id+'">Buy</button></div></div>';
+  });
+  ov.innerHTML = html;
+  ov.classList.remove('hidden');
+  document.getElementById('ov-close').onclick = closeModal;
+  ov.querySelectorAll('[data-buy]').forEach(b=>{
+    b.onclick = ()=>{
+      const id=b.dataset.buy, it=ITEMS[id];
+      if(STATE.money>=it.price){
+        STATE.money-=it.price; STATE.inventory[id]=(STATE.inventory[id]||0)+1;
+        Audio_.money(); showToast('Bought '+it.name+'!'); openShop(shopId);
+      } else { showToast('Not enough money!'); }
+    };
+  });
+}
+
+/* ============================== MENUS ============================== */
+function closeModal(){ modalOpen=false; document.getElementById('overlay').classList.add('hidden'); }
+document.querySelectorAll('#quickbar button').forEach(b=>{
+  b.onclick=()=>{ Audio_.click(); openMenu(b.dataset.menu); };
+});
+function openMenu(type){
+  if(STATE.inBattle) return;
+  modalOpen=true;
+  const ov=document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  if(type==='party') renderPartyMenu(ov);
+  else if(type==='bag') renderBagMenu(ov);
+  else if(type==='quests') renderQuestMenu(ov);
+  else if(type==='dex') renderDexMenu(ov);
+  else if(type==='settings') renderSettingsMenu(ov);
+}
+function hpColor(ratio){ return ratio>0.5?'var(--hp)':ratio>0.2?'var(--hpmid)':'var(--hplow)'; }
+function renderPartyMenu(ov){
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Your Party</h2>';
+  if(STATE.party.length===0) html+='<p style="color:var(--muted)">No monsters yet.</p>';
+  STATE.party.forEach((m,i)=>{
+    const sp=SPECIES[m.species]; const ratio=m.hp/m.maxHp;
+    html += '<div class="mon-row'+(m.hp<=0?' fainted':'')+'">'+
+      '<div><canvas class="icon" width="40" height="40" data-icon="'+i+'"></canvas></div>'+
+      '<div style="flex:1"><b>'+m.nickname+(m.shiny?' ✨':'')+'</b> Lv.'+m.level+' <span class="tag" style="background:'+TYPE_COLORS[sp.type1]+'">'+sp.type1+'</span>'+(sp.type2?'<span class="tag" style="background:'+TYPE_COLORS[sp.type2]+'">'+sp.type2+'</span>':'')+
+      (m.status?'<span class="status-tag">'+m.status+'</span>':'')+
+      '<div class="mini-hpbar"><div style="width:'+(ratio*100)+'%;background:'+hpColor(ratio)+'"></div></div>'+
+      '<span style="font-size:10px">'+m.hp+'/'+m.maxHp+' HP</span></div>'+
+      '</div>';
+  });
+  html += '<h2 style="margin-top:10px">Storage ('+STATE.storage.length+')</h2>';
+  if(STATE.storage.length===0) html+='<p style="color:var(--muted)">Empty.</p>';
+  STATE.storage.forEach((m,i)=>{
+    const sp=SPECIES[m.species];
+    html += '<div class="mon-row"><div style="flex:1"><b>'+m.nickname+(m.shiny?' ✨':'')+'</b> Lv.'+m.level+' ('+sp.type1+')</div>'+
+      (STATE.party.length<6?'<button class="gamebtn" data-tostorage="'+i+'">To Party</button>':'')+'</div>';
+  });
+  ov.innerHTML = html;
+  document.getElementById('ov-close').onclick=closeModal;
+  STATE.party.forEach((m,i)=>{ const c=ov.querySelector('[data-icon="'+i+'"]'); if(c) drawMonsterIcon(c,m); });
+  ov.querySelectorAll('[data-tostorage]').forEach(b=>{
+    b.onclick=()=>{ const idx=+b.dataset.tostorage; const mon=STATE.storage.splice(idx,1)[0]; STATE.party.push(mon); renderPartyMenu(ov); };
+  });
+}
+function renderBagMenu(ov){
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Bag — 💰'+STATE.money+'</h2>';
+  const keys = Object.keys(STATE.inventory).filter(k=>STATE.inventory[k]>0);
+  if(keys.length===0) html+='<p style="color:var(--muted)">Empty.</p>';
+  keys.forEach(id=>{
+    const it=ITEMS[id];
+    html += '<div class="item-row"><div><b>'+it.name+'</b> x'+STATE.inventory[id]+'<br><span style="color:var(--muted)">'+it.desc+'</span></div>'+
+      (it.type==='heal'||it.type==='cure'||it.type==='revive'?'<button class="gamebtn" data-use="'+id+'">Use</button>':'')+'</div>';
+  });
+  ov.innerHTML = html;
+  document.getElementById('ov-close').onclick=closeModal;
+  ov.querySelectorAll('[data-use]').forEach(b=>{
+    b.onclick=()=>{ useFieldItem(b.dataset.use, ov); };
+  });
+}
+function useFieldItem(id, ov){
+  if(STATE.party.length===0){ showToast('No monsters to use this on!'); return; }
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Use on which monster?</h2>';
+  STATE.party.forEach((m,i)=>{
+    html+='<div class="mon-row" data-pick="'+i+'"><div>'+m.nickname+' Lv.'+m.level+' — '+m.hp+'/'+m.maxHp+' HP'+(m.status?' ('+m.status+')':'')+'</div></div>';
+  });
+  ov.innerHTML=html;
+  document.getElementById('ov-close').onclick=()=>renderBagMenu(ov);
+  ov.querySelectorAll('[data-pick]').forEach(el=>{
+    el.onclick=()=>{
+      const i=+el.dataset.pick; const m=STATE.party[i]; const it=ITEMS[id];
+      if(it.type==='heal'){ if(m.hp<=0){showToast('Cannot use on a fainted monster.');return;} m.hp=clamp(m.hp+it.amount,0,m.maxHp); Audio_.heal(); }
+      else if(it.type==='cure'){ m.status=null; Audio_.heal(); }
+      else if(it.type==='revive'){ if(m.hp>0){showToast('That monster is not fainted.');return;} m.hp=Math.floor(m.maxHp/2); Audio_.heal(); }
+      STATE.inventory[id]--; showToast('Used '+it.name+' on '+m.nickname+'!');
+      renderBagMenu(ov);
+    };
+  });
+}
+function renderQuestMenu(ov){
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Quest Log</h2>';
+  STATE.quests.forEach(q=>{
+    const def=QUEST_DEFS[q.id];
+    html += '<div class="quest-row" style="display:block"><b>'+def.title+'</b> '+(q.status==='done'?'<span style="color:var(--accent)">✓ Complete</span>':'<span style="color:var(--accent2)">In Progress</span>')+
+      '<br><span style="color:var(--muted)">'+def.desc+'</span></div>';
+  });
+  html += '<h2 style="margin-top:10px">Badges</h2>';
+  if(STATE.badges.length===0) html+='<p style="color:var(--muted)">None yet.</p>';
+  STATE.badges.forEach(b=>{ html+='<span class="badge-chip">🏅 '+b+'</span>'; });
+  ov.innerHTML=html;
+  document.getElementById('ov-close').onclick=closeModal;
+}
+function renderDexMenu(ov){
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Aurelian Compendium ('+STATE.dex.length+'/20)</h2>';
+  for(let i=1;i<=20;i++){
+    const sp=SPECIES[i]; const seen=STATE.dex.includes(i);
+    html += '<div class="item-row"><div>'+(seen?('<b>#'+i+' '+sp.name+'</b> <span class="tag" style="background:'+TYPE_COLORS[sp.type1]+'">'+sp.type1+'</span>'+(sp.type2?'<span class="tag" style="background:'+TYPE_COLORS[sp.type2]+'">'+sp.type2+'</span>':'')):('<b>#'+i+' ???</b>'))+'</div></div>';
+  }
+  ov.innerHTML=html;
+  document.getElementById('ov-close').onclick=closeModal;
+}
+function renderSettingsMenu(ov){
+  let html='<button class="ov-close" id="ov-close">X</button><h2>Menu</h2>';
+  html += '<div class="item-row"><div>Music</div><button class="gamebtn" id="tog-music">'+(STATE.settings.musicOn?'On':'Off')+'</button></div>';
+  html += '<div class="item-row"><div>Sound Effects</div><button class="gamebtn" id="tog-sfx">'+(STATE.settings.sfxOn?'On':'Off')+'</button></div>';
+  html += '<div class="item-row"><div>Save Game</div><button class="gamebtn" id="btn-save">Save</button></div>';
+  html += '<div class="item-row"><div>Load Game</div><button class="gamebtn" id="btn-load">Load</button></div>';
+  html += '<div class="item-row"><div>Return to Title</div><button class="gamebtn" id="btn-title">Title Screen</button></div>';
+  html += '<p style="color:var(--muted);margin-top:8px">Controls: Arrows/WASD move, E interact, Esc close menus.</p>';
+  ov.innerHTML=html;
+  document.getElementById('ov-close').onclick=closeModal;
+  document.getElementById('tog-music').onclick=(e)=>{ STATE.settings.musicOn=!STATE.settings.musicOn; if(STATE.settings.musicOn) Audio_.startMusic(); else Audio_.stopMusic(); renderSettingsMenu(ov); };
+  document.getElementById('tog-sfx').onclick=(e)=>{ STATE.settings.sfxOn=!STATE.settings.sfxOn; renderSettingsMenu(ov); };
+  document.getElementById('btn-save').onclick=()=>doSave();
+  document.getElementById('btn-load').onclick=()=>doLoad();
+  document.getElementById('btn-title').onclick=()=>{ closeModal(); showTitle(); };
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.remove('hidden'); t.style.opacity=1;
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(()=>{ t.style.opacity=0; setTimeout(()=>t.classList.add('hidden'),300); }, 2200);
+}
+
+/* ============================== SAVE / LOAD ============================== */
+async function doSave(){
+  try{
+    const data = JSON.stringify(STATE);
+    const r = await window.storage.set('aurelia_save', data, false);
+    if(r) showToast('Game saved!'); else showToast('Save failed.');
+  }catch(e){ showToast('Save failed: '+e.message); }
+}
+async function doLoad(){
+  try{
+    const r = await window.storage.get('aurelia_save', false);
+    if(r && r.value){
+      STATE = JSON.parse(r.value);
+      closeModal(); renderMap(); updateHUD();
+      showToast('Game loaded!');
+    } else { showToast('No save found.'); }
+  }catch(e){ showToast('No save found.'); }
+}
+async function hasSave(){
+  try{ const r = await window.storage.get('aurelia_save', false); return !!(r&&r.value); }catch(e){ return false; }
+}
+
+/* ============================== BATTLE SYSTEM ============================== */
+let BATTLE = null;
+const battleScreen = document.getElementById('battle-screen');
+const battleLog = document.getElementById('battle-log');
+const battleMenu = document.getElementById('battle-menu');
+const battleSub = document.getElementById('battle-sub');
+
+function activeAlly(){ return STATE.party.find(m=>m.hp>0); }
+function logMsg(txt){
+  const p=document.createElement('div'); p.textContent=txt; battleLog.appendChild(p);
+  battleLog.scrollTop = battleLog.scrollHeight;
+}
+function clearLog(){ battleLog.innerHTML=''; }
+
+function startWildBattle(speciesId, level, opts){
+  opts=opts||{};
+  if(STATE.party.length===0 || !activeAlly()){ showToast('Your team has no healthy monsters!'); return; }
+  const foe = createMonster(speciesId, level, {shiny:opts.rare?chance(20):undefined});
+  BATTLE = {type:'wild', foe, foeTeam:[foe], foeIdx:0, ally:activeAlly(), turnLock:false, canRun:true, ran:false, trainer:null};
+  enterBattleUI();
+  clearLog(); logMsg('A wild '+foe.nickname+(foe.shiny?' ✨':'')+' appeared!');
+  updateBattlePanels(); showBattleMenu();
+}
+function startTrainerBattle(npc){
+  const team = npc.team.map(t=>createMonster(t.species,t.level));
+  BATTLE = {type:'trainer', foeTeam:team, foeIdx:0, foe:team[0], ally:activeAlly(), turnLock:false, canRun:false, ran:false, trainer:npc};
+  enterBattleUI();
+  clearLog(); logMsg(npc.name+' wants to battle!');
+  updateBattlePanels(); showBattleMenu();
+}
+function enterBattleUI(){
+  STATE.inBattle=true;
+  battleScreen.classList.remove('hidden');
+  document.getElementById('b-foe-mon').querySelector('canvas');
+}
+function exitBattleUI(){
+  STATE.inBattle=false;
+  battleScreen.classList.add('hidden');
+}
+function panelHtml(m, isAlly){
+  if(!m) return '';
+  const sp=SPECIES[m.species]; const ratio=Math.max(0,m.hp)/m.maxHp;
+  let html = '<div class="b-namerow"><b>'+m.nickname+(m.shiny?' ✨':'')+'</b><span>Lv.'+m.level+'</span></div>';
+  html += '<div class="b-hpbar"><div style="width:'+(ratio*100)+'%;background:'+hpColor(ratio)+'"></div></div>';
+  html += '<div>'+Math.max(0,m.hp)+'/'+m.maxHp+' HP'+(m.status?' <span class="status-tag">'+m.status+'</span>':'')+'</div>';
+  if(isAlly){
+    const xr = m.xp/m.xpNext;
+    html += '<div class="b-xpbar"><div style="width:'+(xr*100)+'%"></div></div>';
+  }
+  return html;
+}
+function updateBattlePanels(){
+  document.getElementById('b-foe-panel').innerHTML = panelHtml(BATTLE.foe,false);
+  document.getElementById('b-ally-panel').innerHTML = panelHtml(BATTLE.ally,true);
+  const foeCanvas = document.querySelector('#b-foe-mon canvas');
+  const allyCanvas = document.querySelector('#b-ally-mon canvas');
+  if(BATTLE.foe) drawMonsterIcon(foeCanvas, BATTLE.foe);
+  if(BATTLE.ally) drawMonsterIcon(allyCanvas, BATTLE.ally);
+}
+function showBattleMenu(){
+  battleMenu.classList.remove('hidden'); battleSub.classList.add('hidden');
+  battleMenu.innerHTML =
+    '<button id="bm-fight">Fight</button><button id="bm-bag">Bag</button>'+
+    '<button id="bm-mon">Monsters</button><button id="bm-run">Run</button>';
+  document.getElementById('bm-fight').onclick=()=>showMoveMenu();
+  document.getElementById('bm-bag').onclick=()=>showBattleBag();
+  document.getElementById('bm-mon').onclick=()=>showBattleMonsters(false);
+  document.getElementById('bm-run').onclick=()=>tryRun();
+}
+function showMoveMenu(){
+  battleMenu.classList.add('hidden'); battleSub.classList.remove('hidden');
+  const m = BATTLE.ally;
+  let html = '';
+  m.moves.forEach((mv,i)=>{
+    const move=MOVES[mv.id];
+    html += '<button class="gamebtn" style="width:100%;margin-bottom:4px;text-align:left" data-move="'+i+'" '+(mv.pp<=0?'disabled':'')+'>'+
+      move.name+' <span style="float:right;color:var(--muted)">'+move.type+' '+mv.pp+'/'+mv.maxPp+'</span></button>';
+  });
+  html += '<button class="gamebtn" style="width:100%" id="mv-back">Back</button>';
+  battleSub.innerHTML = html;
+  battleSub.querySelectorAll('[data-move]').forEach(b=>{
+    b.onclick=()=>{ if(BATTLE.turnLock) return; doTurn({type:'move', idx:+b.dataset.move}); };
+  });
+  document.getElementById('mv-back').onclick=()=>showBattleMenu();
+}
+function showBattleBag(){
+  battleMenu.classList.add('hidden'); battleSub.classList.remove('hidden');
+  const keys = Object.keys(STATE.inventory).filter(k=>STATE.inventory[k]>0 && ITEMS[k].type!=='quest' && ITEMS[k].type!=='keyquest');
+  let html='';
+  keys.forEach(id=>{
+    const it=ITEMS[id];
+    html += '<button class="gamebtn" style="width:100%;margin-bottom:4px;text-align:left" data-item="'+id+'">'+it.name+' x'+STATE.inventory[id]+'</button>';
+  });
+  html += '<button class="gamebtn" style="width:100%" id="bag-back">Back</button>';
+  battleSub.innerHTML=html;
+  battleSub.querySelectorAll('[data-item]').forEach(b=>{
+    b.onclick=()=>{
+      const id=b.dataset.item, it=ITEMS[id];
+      if(it.type==='ball'){
+        if(BATTLE.type==='trainer'){ showToast("You can't catch another trainer's monster!"); return; }
+        if(BATTLE.turnLock) return;
+        doTurn({type:'catch', item:id});
+      } else {
+        if(BATTLE.turnLock) return;
+        doTurn({type:'item', item:id});
+      }
+    };
+  });
+  document.getElementById('bag-back').onclick=()=>showBattleMenu();
+}
+function showBattleMonsters(forced){
+  battleMenu.classList.add('hidden'); battleSub.classList.remove('hidden');
+  let html='';
+  STATE.party.forEach((m,i)=>{
+    const disabled = m.hp<=0 || m===BATTLE.ally;
+    html += '<button class="gamebtn" style="width:100%;margin-bottom:4px;text-align:left" data-swap="'+i+'" '+(disabled?'disabled':'')+'>'+
+      m.nickname+' Lv.'+m.level+' ('+m.hp+'/'+m.maxHp+' HP)</button>';
+  });
+  if(!forced) html += '<button class="gamebtn" style="width:100%" id="mon-back">Back</button>';
+  battleSub.innerHTML=html;
+  battleSub.querySelectorAll('[data-swap]').forEach(b=>{
+    b.onclick=()=>{
+      const idx=+b.dataset.swap;
+      if(forced){ BATTLE.ally = STATE.party[idx]; updateBattlePanels(); logMsg('Go, '+BATTLE.ally.nickname+'!'); showBattleMenu(); }
+      else { if(BATTLE.turnLock) return; doTurn({type:'swap', idx}); }
+    };
+  });
+  if(!forced) document.getElementById('mon-back').onclick=()=>showBattleMenu();
+}
+function tryRun(){
+  if(!BATTLE.canRun){ logMsg("You can't run from a trainer battle!"); return; }
+  if(BATTLE.turnLock) return;
+  doTurn({type:'run'});
+}
+
+async function doTurn(playerAction){
+  BATTLE.turnLock = true;
+  battleMenu.classList.add('hidden'); battleSub.classList.add('hidden');
+  let order = [];
+  const playerFirst = playerAction.type==='move' ? decideOrder(BATTLE.ally, BATTLE.foe, MOVES[BATTLE.ally.moves[playerAction.idx].id]) : true;
+
+  if(playerAction.type==='run'){
+    const chanceToFlee = 50 + (BATTLE.ally.spd - BATTLE.foe.spd)*2;
+    await sleep(300);
+    if(chance(clamp(chanceToFlee,10,95))){ logMsg('Got away safely!'); await sleep(700); endBattle('ran'); return; }
+    else { logMsg("Couldn't escape!"); }
+    await foeTurn();
+    finishTurn(); return;
+  }
+  if(playerAction.type==='swap'){
+    logMsg(BATTLE.ally.nickname+', come back!');
+    BATTLE.ally = STATE.party[playerAction.idx];
+    logMsg('Go, '+BATTLE.ally.nickname+'!');
+    updateBattlePanels();
+    await sleep(400);
+    await foeTurn();
+    finishTurn(); return;
+  }
+  if(playerAction.type==='item'){
+    const it = ITEMS[playerAction.item];
+    // use on active ally by default in battle-quick-use
+    if(it.type==='heal'){ BATTLE.ally.hp=clamp(BATTLE.ally.hp+it.amount,0,BATTLE.ally.maxHp); logMsg('Used '+it.name+' on '+BATTLE.ally.nickname+'!'); }
+    else if(it.type==='cure'){ BATTLE.ally.status=null; logMsg('Used '+it.name+'!'); }
+    else if(it.type==='revive'){ showToast('Use Revive from the Monsters/Bag menu outside on fainted allies.'); BATTLE.turnLock=false; showBattleMenu(); return; }
+    STATE.inventory[playerAction.item]--;
+    updateBattlePanels();
+    await sleep(400);
+    await foeTurn();
+    finishTurn(); return;
+  }
+  if(playerAction.type==='catch'){
+    Audio_.catchTry();
+    STATE.inventory[playerAction.item]--;
+    logMsg('You threw a '+ITEMS[playerAction.item].name+'!');
+    await sleep(500);
+    const success = attemptCatch(BATTLE.foe, ITEMS[playerAction.item].mult);
+    if(success){
+      Audio_.catchSuccess();
+      logMsg(BATTLE.foe.nickname+' was caught!');
+      await sleep(700);
+      addCaughtMonster(BATTLE.foe);
+      endBattle('caught'); return;
+    } else {
+      Audio_.catchFail();
+      logMsg('Oh no! The Aurelian broke free!');
+      await sleep(500);
+      await foeTurn();
+      finishTurn(); return;
+    }
+  }
+  if(playerAction.type==='move'){
+    const moveEntry = BATTLE.ally.moves[playerAction.idx];
+    const move = MOVES[moveEntry.id];
+    if(playerFirst){
+      await executeMove(BATTLE.ally, BATTLE.foe, move, moveEntry, true);
+      if(checkFaintAndHandle(BATTLE.foe, true)){ finishTurn(); return; }
+      if(checkFaintAndHandle(BATTLE.ally, false)){ finishTurn(); return; }
+      await foeTurn();
+    } else {
+      await foeTurn(true);
+      if(checkFaintAndHandle(BATTLE.ally, false)){ finishTurn(); return; }
+      if(checkFaintAndHandle(BATTLE.foe, true)) { finishTurn(); return; }
+      await executeMove(BATTLE.ally, BATTLE.foe, move, moveEntry, true);
+      if(checkFaintAndHandle(BATTLE.foe, true)){ finishTurn(); return; }
+    }
+  }
+  finishTurn();
+}
+function decideOrder(ally, foe, allyMove){
+  const foeMove = pickFoeMove();
+  const aP = allyMove.priority||0, fP = foeMove?(foeMove.priority||0):0;
+  if(aP!==fP) return aP>fP;
+  let aSpd = ally.spd*(ally.status==='paralyze'?0.5:1);
+  let fSpd = foe.spd*(foe.status==='paralyze'?0.5:1);
+  if(aSpd===fSpd) return Math.random()<0.5;
+  return aSpd>fSpd;
+}
+function pickFoeMove(){
+  const foe = BATTLE.foe;
+  const usable = foe.moves.filter(m=>m.pp>0);
+  if(usable.length===0) return null;
+  const scored = usable.map(m=>{
+    const mv = MOVES[m.id];
+    let score = mv.power||10;
+    if(mv.cat!=='status'){ score *= typeEff(mv.type, [SPECIES[BATTLE.ally.species].type1, SPECIES[BATTLE.ally.species].type2].filter(Boolean)); }
+    return {m, score: score+Math.random()*15};
+  });
+  scored.sort((a,b)=>b.score-a.score);
+  return MOVES[scored[0].m.id];
+}
+async function foeTurn(pre){
+  const foe = BATTLE.foe;
+  if(foe.hp<=0) return;
+  if(foe.status==='paralyze' && chance(25)){ logMsg(foe.nickname+" is paralyzed and can't move!"); await sleep(500); return; }
+  const usable = foe.moves.filter(m=>m.pp>0);
+  const entry = usable.length? pick(usable) : {id:'tackle',pp:1,maxPp:1};
+  const move = MOVES[entry.id];
+  await executeMove(BATTLE.foe, BATTLE.ally, move, entry, false);
+}
+function applyAbilityBoost(attacker, move, basePower){
+  const abKey = attacker.ability;
+  const boostType = ABILITY_BOOST[abKey];
+  if(boostType && boostType===move.type && attacker.hp/attacker.maxHp <= 0.34) return basePower*1.3;
+  return basePower;
+}
+async function executeMove(attacker, defender, move, moveEntry, attackerIsAlly){
+  if(moveEntry.pp<=0){ moveEntry = {id:'tackle',pp:1,maxPp:1}; move = MOVES.tackle; }
+  moveEntry.pp = Math.max(0, moveEntry.pp-1);
+  logMsg((attackerIsAlly?attacker.nickname:attacker.nickname)+' used '+move.name+'!');
+  await sleep(450);
+  if(!chance(move.acc)){
+    logMsg('But it missed!'); await sleep(400); return;
+  }
+  if(move.cat==='status'){
+    const eff = move.effect;
+    if(eff.heal){
+      const amt = Math.floor(attacker.maxHp*eff.heal);
+      attacker.hp = clamp(attacker.hp+amt,0,attacker.maxHp);
+      logMsg(attacker.nickname+' restored HP!');
+    } else if(eff.stat){
+      const target = eff.target==='self'?attacker:defender;
+      target.statStages[eff.stat] = clamp((target.statStages[eff.stat]||0)+eff.amount,-2,2);
+      logMsg((target===attacker?attacker.nickname:defender.nickname)+"'s "+eff.stat.toUpperCase()+(eff.amount>0?' rose!':' fell!'));
+    }
+    updateBattlePanels(); await sleep(400); return;
+  }
+  const atkSpecies = SPECIES[attacker.species];
+  const defSpecies = SPECIES[defender.species];
+  let atkStat = attacker.atk * statMult(attacker.statStages.atk||0);
+  let defStat = defender.def * statMult(defender.statStages.def||0);
+  const weather = STATE.weatherByMap[STATE.map] ? STATE.weatherByMap[STATE.map].type : 'Clear';
+  let power = applyAbilityBoost(attacker, move, move.power);
+  if(weather==='Rain'){ if(move.type==='Water') power*=1.3; if(move.type==='Fire') power*=0.7; }
+  const stab = (atkSpecies.type1===move.type || atkSpecies.type2===move.type) ? 1.5 : 1;
+  const eff = typeEff(move.type, [defSpecies.type1, defSpecies.type2].filter(Boolean));
+  const crit = chance(6.25) ? 1.5 : 1;
+  let dmg = Math.floor((((2*attacker.level/5+2)*power*(atkStat/Math.max(1,defStat)))/50 + 2) * stab * eff * crit * (0.85+Math.random()*0.15));
+  dmg = Math.max(1, dmg);
+  if(defender.ability==='fluffy' && move.cat==='phy') dmg = Math.floor(dmg*0.8);
+  let sturdySave=false;
+  if(defender.ability==='sturdy' && !defender.sturdyUsed && defender.hp===defender.maxHp && dmg>=defender.hp){
+    dmg = defender.hp-1; sturdySave=true; defender.sturdyUsed=true;
+  }
+  defender.hp = clamp(defender.hp-dmg,0,defender.maxHp);
+  Audio_.hit();
+  updateBattlePanels();
+  if(eff>1) { logMsg("It's super effective!"); Audio_.superEffective(); }
+  else if(eff<1 && eff>0){ logMsg("It's not very effective..."); Audio_.notEffective(); }
+  else if(eff===0){ logMsg("It had no effect..."); }
+  if(crit>1) logMsg('Critical hit!');
+  if(sturdySave) logMsg(defender.nickname+' held on with Sturdy!');
+  await sleep(500);
+  if(defender.ability==='static' && move.cat==='phy' && !defender.status && chance(10)){
+    attacker.status='paralyze'; logMsg(attacker.nickname+' was paralyzed by Static!');
+  }
+  if(move.effect && move.effect.status && !defender.status && defender.hp>0 && chance(move.effect.chance)){
+    defender.status = move.effect.status;
+    logMsg(defender.nickname+' was '+(move.effect.status==='burn'?'burned!':'paralyzed!'));
+  }
+  updateBattlePanels();
+}
+function checkFaintAndHandle(mon, isFoe){
+  if(mon.hp>0) return false;
+  logMsg(mon.nickname+' fainted!');
+  Audio_.faint();
+  return true;
+}
+async function finishTurn(){
+  // end of turn status damage
+  for(const m of [BATTLE.ally, BATTLE.foe]){
+    if(m.hp>0 && m.status==='burn'){
+      const dmg = Math.max(1,Math.floor(m.maxHp/16));
+      m.hp=clamp(m.hp-dmg,0,m.maxHp);
+      logMsg(m.nickname+' is hurt by its burn!');
+    }
+  }
+  updateBattlePanels();
+  await sleep(300);
+  if(BATTLE.foe.hp<=0){
+    await handleFoeFaint();
+    return;
+  }
+  if(BATTLE.ally.hp<=0){
+    const next = STATE.party.find(m=>m.hp>0);
+    if(!next){
+      await sleep(400);
+      await handlePartyWipe();
+      return;
+    } else {
+      await sleep(300);
+      showBattleMonsters(true);
+      BATTLE.turnLock=false;
+      return;
+    }
+  }
+  BATTLE.turnLock=false;
+  showBattleMenu();
+}
+async function handleFoeFaint(){
+  logMsg(BATTLE.foe.nickname+' was defeated!');
+  const xp = Math.floor(SPECIES[BATTLE.foe.species].expYield * BATTLE.foe.level / 5);
+  await sleep(400);
+  await grantXp(BATTLE.ally, xp);
+  if(BATTLE.type==='trainer'){
+    BATTLE.foeIdx++;
+    if(BATTLE.foeIdx < BATTLE.foeTeam.length){
+      BATTLE.foe = BATTLE.foeTeam[BATTLE.foeIdx];
+      logMsg(BATTLE.trainer.name+' sends out '+BATTLE.foe.nickname+'!');
+      updateBattlePanels();
+      await sleep(500);
+      BATTLE.turnLock=false;
+      showBattleMenu();
+      return;
+    } else {
+      await sleep(300);
+      logMsg(BATTLE.trainer.name+' has no more Aurelians!');
+      STATE.money += BATTLE.trainer.money||0;
+      if(BATTLE.trainer.money) { Audio_.money(); logMsg('You received 💰'+BATTLE.trainer.money+'!'); }
+      if(BATTLE.trainer.flagKey) STATE.flags[BATTLE.trainer.flagKey]=true;
+      if(BATTLE.trainer.leader && BATTLE.trainer.badge){
+        STATE.badges.push(BATTLE.trainer.badgeName);
+        STATE.flags[BATTLE.trainer.badge]=true;
+        const qid = BATTLE.trainer.badge==='badge1'?'gym1':'gym2';
+        addQuest(qid); completeQuest(qid);
+        if(BATTLE.trainer.badge==='badge2') addQuest('finalrival');
+        logMsg('You earned the '+BATTLE.trainer.badgeName+'!');
+      }
+      await sleep(300);
+      const postLines = BATTLE.trainer.post.slice();
+      const trainerRef = BATTLE.trainer;
+      endBattle('won');
+      showDialogue(postLines.map(t=>({name:trainerRef.name,text:t})), ()=>{
+        if(trainerRef.final){
+          triggerEnding();
+        }
+      });
+      return;
+    }
+  } else {
+    await sleep(300);
+    endBattle('won');
+  }
+}
+async function grantXp(mon, xp){
+  mon.xp += xp;
+  logMsg(mon.nickname+' gained '+xp+' XP!');
+  updateBattlePanels();
+  await sleep(400);
+  while(mon.xp >= mon.xpNext){
+    mon.xp -= mon.xpNext;
+    mon.level++;
+    const sp = SPECIES[mon.species];
+    const stats = calcStats(sp, mon.level);
+    const hpGain = stats.maxHp - mon.maxHp;
+    mon.maxHp = stats.maxHp; mon.hp = clamp(mon.hp+hpGain,0,mon.maxHp);
+    mon.atk = stats.atk; mon.def = stats.def; mon.spd = stats.spd;
+    mon.xpNext = xpToNext(mon.level);
+    Audio_.levelUp();
+    logMsg(mon.nickname+' grew to Lv.'+mon.level+'!');
+    // learn moves
+    const learnable = sp.moves.filter(m=>m.lvl===mon.level);
+    for(const l of learnable){
+      if(mon.moves.length<4){ mon.moves.push({id:l.m,pp:MOVES[l.m].pp,maxPp:MOVES[l.m].pp}); logMsg(mon.nickname+' learned '+MOVES[l.m].name+'!'); }
+      else { mon.moves.shift(); mon.moves.push({id:l.m,pp:MOVES[l.m].pp,maxPp:MOVES[l.m].pp}); logMsg(mon.nickname+' forgot a move and learned '+MOVES[l.m].name+'!'); }
+    }
+    updateBattlePanels();
+    await sleep(500);
+    if(sp.evoLevel && mon.level>=sp.evoLevel && sp.evoId){
+      await sleep(200);
+      Audio_.evolve();
+      logMsg('What? '+mon.nickname+' is evolving!');
+      await sleep(700);
+      const newSp = SPECIES[sp.evoId];
+      mon.species = newSp.id; mon.nickname = newSp.name; mon.ability = newSp.ability;
+      const ns = calcStats(newSp, mon.level);
+      const ratio = mon.hp/mon.maxHp;
+      mon.maxHp=ns.maxHp; mon.hp=Math.ceil(ns.maxHp*ratio); mon.atk=ns.atk; mon.def=ns.def; mon.spd=ns.spd;
+      if(!STATE.dex.includes(newSp.id)) STATE.dex.push(newSp.id);
+      logMsg('Congratulations! Your Aurelian evolved into '+newSp.name+'!');
+      updateBattlePanels();
+      await sleep(700);
+    }
+  }
+}
+function attemptCatch(mon, ballMult){
+  const sp = SPECIES[mon.species];
+  const a = ((3*mon.maxHp - 2*mon.hp) * sp.catchRate * ballMult) / (3*mon.maxHp);
+  const prob = clamp(a/255, 0.03, 0.98);
+  return Math.random() < prob;
+}
+function addCaughtMonster(mon){
+  if(STATE.party.length<6) STATE.party.push(mon);
+  else STATE.storage.push(mon);
+}
+async function handlePartyWipe(){
+  logMsg('You have no more Aurelians that can fight...');
+  await sleep(700);
+  endBattle('lost');
+  STATE.money = Math.floor(STATE.money*0.5);
+  STATE.party.forEach(m=>{ m.hp = Math.max(1, Math.floor(m.maxHp*0.5)); m.status=null; });
+  STATE.map='hollow'; STATE.x=8; STATE.y=9; renderMap(); updateHUD();
+  showDialogue([{name:'',text:'You dash back to town, having lost half your coins...'},{name:'Nurse Wren',text:'Oh dear! Let me patch up your team.'}], ()=>{
+    STATE.party.forEach(m=>{m.hp=m.maxHp; m.status=null;});
+  });
+}
+function endBattle(result){
+  exitBattleUI();
+  BATTLE=null;
+  renderMap(); updateHUD();
+}
+function triggerEnding(){
+  setTimeout(()=>{
+    showDialogue([
+      {name:'',text:'The Ancient Chamber grows quiet.'},
+      {name:'Vex',text:"You've become someone truly formidable."},
+      {name:'Vex',text:"Both badges earned, and now this victory too... Aurelia Frontier is yours to explore, partner."},
+      {name:'',text:'★ ★ ★  THE END (of this chapter)  ★ ★ ★'},
+      {name:'',text:'Aurelians caught: '+ (STATE.dex.length) +'/20   Badges: '+STATE.badges.length+'/2'},
+      {name:'',text:'Feel free to keep exploring, battling trainers, and completing side quests!'}
+    ]);
+  }, 300);
+}
+
+/* ============================== INPUT ============================== */
+window.addEventListener('keydown', (e)=>{
+  if(document.getElementById('title-screen') && !document.getElementById('title-screen').classList.contains('hidden')) return;
+  const k = e.key.toLowerCase();
+  if(STATE.inBattle){ return; }
+  if(k==='escape'){ if(modalOpen) closeModal(); return; }
+  if(modalOpen) return;
+  if(k==='arrowup'||k==='w') tryMove('up');
+  else if(k==='arrowdown'||k==='s') tryMove('down');
+  else if(k==='arrowleft'||k==='a') tryMove('left');
+  else if(k==='arrowright'||k==='d') tryMove('right');
+  else if(k==='e'||k==='enter') interact();
+  else if(k==='i') openMenu('bag');
+  else if(k==='p') openMenu('party');
+  else if(k==='q') openMenu('quests');
+});
+
+/* ============================== TITLE / INIT ============================== */
+function showTitle(){
+  document.getElementById('title-screen').classList.remove('hidden');
+  Audio_.stopMusic();
+}
+async function initTitle(){
+  const has = await hasSave();
+  document.getElementById('btn-continue').style.display = has ? 'block' : 'none';
+}
+document.getElementById('btn-new').onclick = ()=>{
+  STATE = freshState();
+  document.getElementById('title-screen').classList.add('hidden');
+  renderMap(); updateHUD(); Audio_.startMusic();
+  showDialogue([{name:'',text:'Welcome to Aurelia Frontier!'},{name:'',text:'Visit the Lab (the brown-roofed building) to begin your journey.'}]);
+};
+document.getElementById('btn-continue').onclick = async ()=>{
+  await doLoad();
+  document.getElementById('title-screen').classList.add('hidden');
+  Audio_.startMusic();
+};
+
+STATE = freshState();
+initTitle();
+renderMap();
+updateHUD();
+
+/* Periodic clock tick while exploring (idle time passage + re-render for weather anim) */
+setInterval(()=>{
+  if(!STATE.inBattle && !modalOpen && !dialogueActive){
+    renderMap();
+  }
+}, 220);
+
+})();
+</script>
+</body>
+</html>
